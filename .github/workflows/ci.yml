@@ -68,9 +68,42 @@ jobs:
       # See https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html?highlight=cmake_build_type
       run: >
         cmake -B ${{ steps.strings.outputs.build-output-dir }}
-        -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
         -S ${{ github.workspace }}
+        -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+        -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}/install"
 
     - name: Build
       # Build your program with the given configuration. Note that --config is needed because the default Windows generator is a multi-config generator (Visual Studio generator).
       run: cmake --build ${{ steps.strings.outputs.build-output-dir }} --config ${{ matrix.build_type }}
+    - name: Install Result
+      run: cmake --install ${{ steps.strings.outputs.build-output-dir }} --config ${{ matrix.build_type }}
+
+    - name: zip the result elf
+      if: startsWith(runner.os, 'Linux')
+      run: |
+        cd install/bin
+        7z a createplaylist-linux.zip createplaylist
+
+    - name: zip the result exe
+      if: startsWith(runner.os, 'Windows')
+      run: |
+        cd install/bin
+        7z a createplaylist-win64.zip createplaylist.exe
+
+    - name: upload exe Release
+      if: startsWith(github.ref, 'refs/tags/') && startsWith(runner.os, 'Windows') && matrix.build_type == 'Release'
+      uses: softprops/action-gh-release@v2
+      with:
+        files: install/bin/createplaylist-win64.zip
+
+    - name: upload linux Release
+      if: startsWith(github.ref, 'refs/tags/') && startsWith(runner.os, 'Linux') && matrix.build_type == 'Release' && matrix.c_compiler == 'gcc'
+      uses: softprops/action-gh-release@v2
+      with:
+        files: install/bin/createplaylist-linux.zip
+
+    - name: Upload generic artifacts
+      uses: actions/upload-artifact@v4.4.0
+      with:
+        name: install-bin-${{ runner.os }}-${{ matrix.c_compiler }}-${{ matrix.build_type }}
+        path: install/bin
