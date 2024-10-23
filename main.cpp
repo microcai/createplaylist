@@ -1,6 +1,5 @@
 ﻿
 
-#include <glob.h>
 #ifdef _WIN32
 #include <windows.h>
 #include <io.h>
@@ -18,6 +17,8 @@
 #include <map>
 #include <string>
 #include <vector>
+
+#include <glob.h>
 
 template<typename T>
 concept ContainerType = requires(T a) {
@@ -287,13 +288,13 @@ int main(int argc, char* argv[])
 
 	std::ofstream m3u8;
 
-	bool is_pipe = ! isatty(1);
+	bool is_tty = isatty(1);
 #ifdef _WIN32
-	outputs.push_back({std::cout, !is_pipe, is_pipe});
+	outputs.push_back({std::cout, is_tty, GetACP() == CP_UTF8 ? true : !is_tty});
 #else
-	outputs.push_back({std::cout, !is_pipe, false});
+	outputs.push_back({std::cout, is_tty, false});
 #endif
-	if (is_pipe)
+	if (!is_tty)
 	{
 		std::cout << "#EXTM3U" << std::endl;
 	}
@@ -335,7 +336,7 @@ int main(int argc, char* argv[])
 
 					out.outstream << f.substr(digi_for_episode, remain_pos - digi_for_episode);
 
-					if (!is_pipe)
+					if (out.is_tty)
 					{
 						out.outstream << "\033[0m";
 					}

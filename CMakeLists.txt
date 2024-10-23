@@ -10,3 +10,5 @@ if (WIN32)
 endif()
 
 add_executable(createplaylist main.cpp)
+
+install(TARGETS createplaylist DESTINATION bin)
