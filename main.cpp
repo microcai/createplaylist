@@ -193,8 +193,8 @@ struct compare_on
 	bool operator()(const std::string& a, const std::string& b) const
 	{
 		unsigned cond = 0;
-		cond |= std::isdigit(a[_idx]) ? 1 : 0;
-		cond |= std::isdigit(b[_idx]) ? 2 : 0;
+		cond |= a.size() > _idx ? (std::isdigit(a[_idx]) ? 1 : 0) : 0;
+		cond |= b.size() > _idx ? (std::isdigit(b[_idx]) ? 2 : 0) : 0;
 		switch (cond)
 		{
 		case 0:
@@ -320,32 +320,39 @@ int main(int argc, char* argv[])
 		{
 			if (out.is_tty)
 			{
-				// output color full digit
-				out.outstream << f.substr(0, digi_for_episode);
-
-				char* r = nullptr;
-				strtoll(&f[digi_for_episode], &r, 10);
-
-				if (r)
+				if (digi_for_episode < f.size())
 				{
-					auto remain_pos = r - f.c_str();
-					if (out.is_tty)
+					// output color full digit
+					out.outstream << f.substr(0, digi_for_episode);
+
+					char* r = nullptr;
+					strtoll(&f[digi_for_episode], &r, 10);
+
+					if (r)
 					{
-						out.outstream << "\033[0;35m" << "\u001b[1m";
+						auto remain_pos = r - f.c_str();
+						if (out.is_tty)
+						{
+							out.outstream << "\033[0;35m" << "\u001b[1m";
+						}
+
+						out.outstream << f.substr(digi_for_episode, remain_pos - digi_for_episode);
+
+						if (out.is_tty)
+						{
+							out.outstream << "\033[0m";
+						}
+
+						out.outstream << f.substr(remain_pos);
 					}
-
-					out.outstream << f.substr(digi_for_episode, remain_pos - digi_for_episode);
-
-					if (out.is_tty)
+					else
 					{
-						out.outstream << "\033[0m";
+						out.outstream << f.substr(digi_for_episode);
 					}
-
-					out.outstream << f.substr(remain_pos);
 				}
 				else
 				{
-					out.outstream << f.substr(digi_for_episode);
+					out.outstream << f;
 				}
 				out.outstream << std::endl;
 			}
