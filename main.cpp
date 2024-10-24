@@ -26,14 +26,16 @@ concept ContainerType = requires(T a) {
 	std::end(a);
 };
 
-template<ContainerType Container> auto merge(Container&& list1, Container&& list2)
+template<ContainerType Container>
+auto merge(Container&& list1, Container&& list2)
 {
 	std::decay_t<Container> ret = list1;
 	std::copy(std::begin(list2), std::end(list2), std::back_inserter(ret));
 	return ret;
 }
 
-template<typename resourcetype, typename cleanuper = decltype(&free)> struct raii_resource
+template<typename resourcetype, typename cleanuper = decltype(&free)>
+struct raii_resource
 {
 	resourcetype _managed_resource;
 	cleanuper _cleanuper;
@@ -99,7 +101,7 @@ auto glob(std::string pattern)
 	for (auto i = 0; i < glob_result->gl_pathc; i++)
 	{
 		std::string globed_file{glob_result->gl_pathv[i]};
-		ret.push_back(std::filesystem::path{globed_file});
+		ret.push_back(std::filesystem::path{std::move(globed_file)});
 	}
 
 	return ret;
@@ -183,44 +185,51 @@ auto find_digi_for_episode(Container&& list)
 	return idx_counts.rbegin()->first;
 }
 
-struct compare_on
+// 将 文件名 给拆分成一个一个的“段落”
+// 每个段落进行单独的比较大小
+// 比如 ABC-第2集.mp4
+// 拆分成 'ABC', '-', '第', 2, '集','.', 'mp4'
+// 比如 ABC-第11集.mp4
+// 拆分成 'ABC', '-', '第', 11, '集','.', 'mp4'
+// 那么，进行比较的时候， 依次对每个分段进行比较
+// 自然比较到 11 > 2 的时候，比较就结束了。
+// 这样，比纯 ascii 码，第2集 就一定会排在 11 集的前面。
+struct segmented_filename_compare
 {
-	int _idx;
-	compare_on(int idx) : _idx(idx)
+	bool operator()(const std::string& a, const std::string& b)
 	{
-	}
-
-	bool operator()(const std::string& a, const std::string& b) const
-	{
-		unsigned cond = 0;
-		cond |= a.size() > _idx ? (std::isdigit(a[_idx]) ? 1 : 0) : 0;
-		cond |= b.size() > _idx ? (std::isdigit(b[_idx]) ? 2 : 0) : 0;
-		switch (cond)
+		int idx = 0;
+		do
 		{
-		case 0:
-			return a < b;
-		case 1:
-			return true;
-		case 2:
-			return false;
-		case 3:
+			// 接下来是数字，直接比较数字大小
+			if (std::isdigit(a[idx]) && std::isdigit(b[idx]))
 			{
-				auto episode_a = std::strtol(&(a[_idx]), nullptr, 10);
-				auto episode_b = std::strtol(&(b[_idx]), nullptr, 10);
 
-				return episode_a < episode_b;
+				auto digit_a = std::strtol(&(a[idx]), nullptr, 10);
+				auto digit_b = std::strtol(&(b[idx]), nullptr, 10);
+				if (digit_a != digit_b)
+				{
+					return digit_a < digit_b;
+				}
 			}
-		default:
-			return true;
-		}
 
-		return false;
+			if (a[idx] != b[idx])
+			{
+				return a[idx] < b[idx];
+			}
+
+			idx ++;
+
+		}while( idx < a.length() && idx < b.length() );
+
+		return a.length() < b.length();
 	}
 
-	bool operator()(const std::filesystem::path& a, const std::filesystem::path& b) const
+	bool operator()(const std::filesystem::path& a, const std::filesystem::path& b)
 	{
-		return (*this)(a.string(), b.string());
+		return(*this)(a.string(), b.string());
 	}
+
 };
 
 template<ContainerType Container> auto get_base_names(Container&& files)
@@ -264,38 +273,12 @@ struct output
 int chdir(const char* newdir)
 {
 	return SetCurrentDirectoryA(newdir) ? 0 : 1;
-}	
+}
 #endif
 
-int main(int argc, char* argv[])
+template<ContainerType Container>
+void do_outputs(Container&& files)
 {
-	// 首先进入到目标目录. 然后列举出所有的视频文件
-	if (argc == 2)
-	{
-		if (chdir(argv[1]) != 0)
-		{
-			perror("failed to chdir");
-			return 2;
-		}
-	}
-	auto mkvfiles = glob("*.mkv");
-	auto mp4files = glob("*.mp4");
-	auto files = merge(mkvfiles, mp4files);
-
-	auto file_names = get_base_names(files);
-
-	// 接着寻找表征 第几集 的数字所在的位置
-	auto digi_for_episode = find_digi_for_episode(file_names);
-	// 然后根据这个数字排序
-	std::sort(std::begin(files), std::end(files), compare_on(digi_for_episode));
-
-	// 最后输出 m3u8 格式
-
-	if (files.empty())
-	{
-		std::cerr << "no videos found" << std::endl;
-		return 1;
-	}
 
 	std::vector<output> outputs;
 
@@ -327,7 +310,11 @@ int main(int argc, char* argv[])
 		m3u8 << "#EXT-X-START" << std::endl;
 	}
 
-	for (auto file : files)
+	// 寻找表征 第几集 的数字所在的位置，用来进行变色打印
+	auto file_names = get_base_names(files);
+	auto digi_for_episode = find_digi_for_episode(file_names);
+
+	for (const auto& file : files)
 	{
 		std::string f = file.string();
 
@@ -390,6 +377,37 @@ int main(int argc, char* argv[])
 	{
 		*output << "#EXT-X-ENDLIST" << std::endl;
 	}
+
+}
+
+int main(int argc, char* argv[])
+{
+	// 首先进入到目标目录. 然后列举出所有的视频文件
+	if (argc == 2)
+	{
+		if (chdir(argv[1]) != 0)
+		{
+			perror("failed to chdir");
+			return 2;
+		}
+	}
+	auto mkvfiles = glob("*.mkv");
+	auto mp4files = glob("*.mp4");
+	auto files = merge(mkvfiles, mp4files);
+
+
+	// 进行根据文件名里的自然阿拉伯数字进行排序
+	std::sort(std::begin(files), std::end(files), segmented_filename_compare{});
+
+	// 最后输出 m3u8 格式
+
+	if (files.empty())
+	{
+		std::cerr << "no videos found" << std::endl;
+		return 1;
+	}
+
+	do_outputs(files);
 
 	return 0;
 }
