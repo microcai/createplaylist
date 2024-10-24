@@ -194,6 +194,7 @@ auto find_digi_for_episode(Container&& list)
 // 那么，进行比较的时候， 依次对每个分段进行比较
 // 自然比较到 11 > 2 的时候，比较就结束了。
 // 这样，比纯 ascii 码，第2集 就一定会排在 11 集的前面。
+template<bool reverse = false>
 struct segmented_filename_compare
 {
 	bool operator()(const std::string& a, const std::string& b)
@@ -209,20 +210,29 @@ struct segmented_filename_compare
 				auto digit_b = std::strtol(&(b[idx]), nullptr, 10);
 				if (digit_a != digit_b)
 				{
-					return digit_a < digit_b;
+					if constexpr (reverse)
+						return digit_a >= digit_b;
+					else
+						return digit_a < digit_b;
 				}
 			}
 
 			if (a[idx] != b[idx])
 			{
-				return a[idx] < b[idx];
+				if constexpr (reverse)
+					return a[idx] >= b[idx];
+				else
+					return a[idx] < b[idx];
 			}
 
 			idx ++;
 
 		}while( idx < a.length() && idx < b.length() );
 
-		return a.length() < b.length();
+		if constexpr (reverse)
+			return a.length() >= b.length();
+		else
+			return a.length() < b.length();
 	}
 
 	bool operator()(const std::filesystem::path& a, const std::filesystem::path& b)
