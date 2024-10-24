@@ -15,6 +15,9 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
+#include <vector>
+#include <string>
+
 #ifndef GLOB_H
 #define GLOB_H 1
 
@@ -33,12 +36,8 @@
 typedef struct glob_t
 {
     unsigned gl_pathc;
-    char **gl_pathv;
+    std::vector<std::string> gl_pathv;
 } glob_t;
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 int
 glob(
@@ -50,9 +49,5 @@ glob(
 void
 globfree(
     glob_t* pglob);
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif /* ifndef GLOB_H */
