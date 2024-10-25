@@ -21,7 +21,9 @@
 
 #include <glob.h>
 
+#include "nowide/convert.hpp"
 #include "nowide/iostream.hpp"
+#include "nowide/args.hpp"
 
 template<typename T>
 concept ContainerType = requires(T a) {
@@ -263,13 +265,6 @@ struct output
 	bool is_tty;
 };
 
-#ifdef _WIN32
-int chdir(const char* newdir)
-{
-	return SetCurrentDirectoryA(newdir) ? 0 : 1;
-}
-#endif
-
 template<ContainerType Container>
 void do_outputs(Container&& files)
 {
@@ -282,14 +277,15 @@ void do_outputs(Container&& files)
 
 	bool is_tty = isatty(1);
 
-	outputs.push_back({nowide::cout, is_tty});
 
 	if (!is_tty)
 	{
+		outputs.push_back({std::cout, is_tty});
 		nowide::cout << "#EXTM3U" << std::endl;
 	}
 	else
 	{
+		outputs.push_back({nowide::cout, is_tty});
 		m3u8.open("000-playlist.m3u8");
 		m3u8 << "#EXTM3U" << std::endl;
 		m3u8 << "#EXT-X-TITLE: auto-play-all" << std::endl;
@@ -361,8 +357,16 @@ void do_outputs(Container&& files)
 
 }
 
-int main(int argc, char* argv[])
+#ifdef _WIN32
+int chdir(const char* newdir)
 {
+	return SetCurrentDirectoryW(nowide::widen(newdir).c_str()) ? 0 : 1;
+}
+#endif
+
+int main(int argc, char** argv, char** env)
+{
+	nowide::args _args{argc, argv, env};
 	// 首先进入到目标目录. 然后列举出所有的视频文件
 	if (argc == 2)
 	{
