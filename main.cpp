@@ -344,7 +344,6 @@ void do_outputs(Container&& files)
 			}
 			else
 			{
-
 				out.outstream << f << std::endl;
 			}
 		}
