@@ -23,19 +23,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string>
+#include "nowide/convert.hpp"
 
 int glob(const char* pattern, int flags, void* unused, glob_t* pglob)
 {
 	std::string path;
 	int err = 0;
 	size_t len;
-	int pattern_len = strlen(pattern);
 	WIN32_FIND_DATAW finddata = {0};
-
-	std::wstring wpattern;
-	int wchar_pattern_length = MultiByteToWideChar(CP_UTF8, 0, pattern, pattern_len, 0, 0);
-	wpattern.resize(wchar_pattern_length);
-	MultiByteToWideChar(CP_UTF8, 0, pattern, pattern_len, &wpattern[0], wchar_pattern_length);
 
 	pglob->gl_pathc = 0;
 
@@ -48,7 +43,7 @@ int glob(const char* pattern, int flags, void* unused, glob_t* pglob)
 	}
 	path.resize(len);
 
-	HANDLE hfindfile = FindFirstFileExW(wpattern.c_str(), FindExInfoBasic, &finddata, FindExSearchNameMatch, nullptr, 0);
+	HANDLE hfindfile = FindFirstFileExW(nowide::widen(pattern).c_str(), FindExInfoBasic, &finddata, FindExSearchNameMatch, nullptr, 0);
 
 	if (!pattern || flags != (flags & GLOB_FLAGS) || unused || !pglob)
 	{
@@ -62,11 +57,7 @@ int glob(const char* pattern, int flags, void* unused, glob_t* pglob)
 		{
 			pglob->gl_pathc ++;
 
-			std::string cFileName;
-			auto cFileNameW_len = lstrlenW(finddata.cFileName);
-			int u8char_length = WideCharToMultiByte(CP_ACP, 0, finddata.cFileName, cFileNameW_len, 0, 0, 0, 0);
-			cFileName.resize(u8char_length);
-			WideCharToMultiByte(CP_ACP, 0, finddata.cFileName, cFileNameW_len, &cFileName[0], u8char_length, 0, 0);
+			std::string cFileName = nowide::narrow(finddata.cFileName);
 
 			pglob->gl_pathv.push_back( path + cFileName );
 		}

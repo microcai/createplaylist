@@ -4,14 +4,14 @@ project(createplaylist)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded")
 
+add_subdirectory(nowide_standalone_v11.3.0)
+link_libraries(nowide::nowide)
+
 if (WIN32)
     add_subdirectory(win32port)
     link_libraries(win32port)
 endif()
 
-add_subdirectory(nowide_standalone_v11.3.0)
-
-link_libraries(nowide::nowide)
 
 add_executable(createplaylist main.cpp)
 

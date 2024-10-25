@@ -37,12 +37,6 @@ auto merge(Container&& list1, Container&& list2)
 	return ret;
 }
 
-std::ostream& operator << (std::ostream& out, const std::u8string& str)
-{
-	out.write(reinterpret_cast<const char*>(str.c_str()), str.size());
-	return out;
-}
-
 template<typename resourcetype, typename cleanuper = decltype(&free)>
 struct raii_resource
 {
