@@ -30,10 +30,12 @@ int glob(const char* pattern, int flags, void* unused, glob_t* pglob)
 	int err = 0;
 	size_t len;
 	int pattern_len = strlen(pattern);
-	WIN32_FIND_DATAA finddata = {0};
-	// int wchar_length = MultiByteToWideChar(CP_UTF8, 0, pattern, pattern_len, 0, 0);
-	// wchar_t* wpattern = malloc(wchar_length);
-	// MultiByteToWideChar(CP_UTF8, 0, pattern, pattern_len, wpattern, wchar_length);
+	WIN32_FIND_DATAW finddata = {0};
+
+	std::wstring wpattern;
+	int wchar_pattern_length = MultiByteToWideChar(CP_UTF8, 0, pattern, pattern_len, 0, 0);
+	wpattern.resize(wchar_pattern_length);
+	MultiByteToWideChar(CP_UTF8, 0, pattern, pattern_len, &wpattern[0], wchar_pattern_length);
 
 	pglob->gl_pathc = 0;
 
@@ -46,7 +48,7 @@ int glob(const char* pattern, int flags, void* unused, glob_t* pglob)
 	}
 	path.resize(len);
 
-	HANDLE hfindfile = FindFirstFileA(pattern, &finddata);
+	HANDLE hfindfile = FindFirstFileExW(wpattern.c_str(), FindExInfoBasic, &finddata, FindExSearchNameMatch, nullptr, 0);
 
 	if (!pattern || flags != (flags & GLOB_FLAGS) || unused || !pglob)
 	{
@@ -59,9 +61,16 @@ int glob(const char* pattern, int flags, void* unused, glob_t* pglob)
 		do
 		{
 			pglob->gl_pathc ++;
-			pglob->gl_pathv.push_back( path + finddata.cFileName );
+
+			std::string cFileName;
+			auto cFileNameW_len = lstrlenW(finddata.cFileName);
+			int u8char_length = WideCharToMultiByte(CP_ACP, 0, finddata.cFileName, cFileNameW_len, 0, 0, 0, 0);
+			cFileName.resize(u8char_length);
+			WideCharToMultiByte(CP_ACP, 0, finddata.cFileName, cFileNameW_len, &cFileName[0], u8char_length, 0, 0);
+
+			pglob->gl_pathv.push_back( path + cFileName );
 		}
-		while (!err && FindNextFileA(hfindfile, &finddata));
+		while (!err && FindNextFileW(hfindfile, &finddata));
 
 		FindClose(hfindfile);
 	}
