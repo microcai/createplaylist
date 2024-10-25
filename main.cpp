@@ -195,7 +195,7 @@ auto find_digi_for_episode(Container&& list)
 // 自然比较到 11 > 2 的时候，比较就结束了。
 // 这样，比纯 ascii 码，第2集 就一定会排在 11 集的前面。
 template<bool reverse = false>
-struct segmented_filename_compare
+struct filename_human_compare
 {
 	bool operator()(const std::string& a, const std::string& b)
 	{
@@ -407,7 +407,7 @@ int main(int argc, char* argv[])
 
 
 	// 进行根据文件名里的自然阿拉伯数字进行排序
-	std::sort(std::begin(files), std::end(files), segmented_filename_compare{});
+	std::sort(std::begin(files), std::end(files), filename_human_compare{});
 
 	// 最后输出 m3u8 格式
 
