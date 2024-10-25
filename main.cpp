@@ -3,14 +3,13 @@
 #ifdef _WIN32
 #include <windows.h>
 #include <io.h>
+#include "nowide/convert.hpp"
 #else
 #include <unistd.h>
 #endif
 
 #include <algorithm>
 #include <cctype>
-#include <concepts>
-#include <codecvt>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -21,7 +20,6 @@
 
 #include <glob.h>
 
-#include "nowide/convert.hpp"
 #include "nowide/iostream.hpp"
 #include "nowide/args.hpp"
 
@@ -386,11 +384,7 @@ int main(int argc, char** argv, char** env)
 	if (!is_tty)
 	{
 		glob_pattern_prefix = argv[1];
-#ifdef _WIN32
-		glob_pattern_prefix += '\\';
-#else
-		glob_pattern_prefix += '/';
-#endif
+		glob_pattern_prefix += std::filesystem::path::preferred_separator;
 	}
 
 	auto mkvfiles = glob(glob_pattern_prefix + "*.mkv");
