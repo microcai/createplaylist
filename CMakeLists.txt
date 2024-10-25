@@ -4,6 +4,10 @@ project(createplaylist)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded")
 
+if (MSVC)
+    add_compile_options(/utf-8)
+endif()
+
 add_subdirectory(nowide_standalone_v11.3.0)
 link_libraries(nowide::nowide)
 
