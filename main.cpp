@@ -95,7 +95,7 @@ struct raii_resource
 	}
 };
 
-auto glob(std::u8string pattern)
+auto glob(std::string pattern)
 {
 	std::vector<std::filesystem::path> ret;
 
@@ -366,18 +366,36 @@ int chdir(const char* newdir)
 
 int main(int argc, char** argv, char** env)
 {
+	bool is_tty = isatty(1);
+
 	nowide::args _args{argc, argv, env};
 	// 首先进入到目标目录. 然后列举出所有的视频文件
 	if (argc == 2)
 	{
-		if (chdir(argv[1]) != 0)
+		if (is_tty)
 		{
-			perror("failed to chdir");
-			return 2;
+			if (chdir(argv[1]) != 0)
+			{
+				perror("failed to chdir");
+				return 2;
+			}
 		}
 	}
-	auto mkvfiles = glob(u8"*.mkv");
-	auto mp4files = glob(u8"*.mp4");
+
+	std::string glob_pattern_prefix;
+
+	if (!is_tty)
+	{
+		glob_pattern_prefix = argv[1];
+#ifdef _WIN32
+		glob_pattern_prefix += '\\';
+#else
+		glob_pattern_prefix += '/';
+#endif
+	}
+
+	auto mkvfiles = glob(glob_pattern_prefix + "*.mkv");
+	auto mp4files = glob(glob_pattern_prefix + "*.mp4");
 	auto files = merge(mkvfiles, mp4files);
 
 
