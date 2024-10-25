@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <cctype>
 #include <concepts>
+#include <codecvt>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -19,6 +20,8 @@
 #include <vector>
 
 #include <glob.h>
+
+#include "nowide/iostream.hpp"
 
 template<typename T>
 concept ContainerType = requires(T a) {
@@ -32,6 +35,12 @@ auto merge(Container&& list1, Container&& list2)
 	std::decay_t<Container> ret = list1;
 	std::copy(std::begin(list2), std::end(list2), std::back_inserter(ret));
 	return ret;
+}
+
+std::ostream& operator << (std::ostream& out, const std::u8string& str)
+{
+	out.write(reinterpret_cast<const char*>(str.c_str()), str.size());
+	return out;
 }
 
 template<typename resourcetype, typename cleanuper = decltype(&free)>
@@ -90,13 +99,13 @@ struct raii_resource
 	}
 };
 
-auto glob(std::string pattern)
+auto glob(std::u8string pattern)
 {
 	std::vector<std::filesystem::path> ret;
 
 	raii_resource<glob_t, decltype(&globfree)> glob_result{&globfree};
 
-	::glob(pattern.c_str(), GLOB_ERR | GLOB_MARK | GLOB_NOSORT | GLOB_NOESCAPE, nullptr, &glob_result);
+	::glob(reinterpret_cast<const char*>(pattern.c_str()), GLOB_ERR | GLOB_MARK | GLOB_NOSORT | GLOB_NOESCAPE, nullptr, &glob_result);
 
 	for (auto i = 0; i < glob_result->gl_pathc; i++)
 	{
@@ -254,29 +263,10 @@ template<ContainerType Container> auto get_base_names(Container&& files)
 	return ret;
 }
 
-#ifdef _WIN32
-std::string filename_to_utf8(std::string f)
-{
-	std::wstring wbuf;
-	wbuf.resize(f.size());
-	const char * src = f.data();
-	auto wchar_count = MultiByteToWideChar(CP_ACP, MB_ERR_INVALID_CHARS, src, f.size(), &wbuf[0], wbuf.size());
-	wbuf.resize(wchar_count);
-
-	std::string utf8;
-	utf8.resize(wchar_count * 4);
-	auto utf8_len = WideCharToMultiByte(CP_UTF8, 0, wbuf.c_str(), wbuf.size(), &utf8[0], utf8.size(), nullptr, nullptr);
-	utf8.resize(utf8_len);
-
-	return utf8;
-}
-#endif
-
 struct output
 {
 	std::ostream& outstream;
 	bool is_tty;
-	bool to_utf8;
 };
 
 #ifdef _WIN32
@@ -297,27 +287,21 @@ void do_outputs(Container&& files)
 	std::ofstream m3u8;
 
 	bool is_tty = isatty(1);
-#ifdef _WIN32
-	outputs.push_back({std::cout, is_tty, GetACP() == CP_UTF8 ? true : !is_tty});
-#else
-	outputs.push_back({std::cout, is_tty, false});
-#endif
+
+	outputs.push_back({nowide::cout, is_tty});
+
 	if (!is_tty)
 	{
-		std::cout << "#EXTM3U" << std::endl;
+		nowide::cout << "#EXTM3U" << std::endl;
 	}
 	else
 	{
 		m3u8.open("000-playlist.m3u8");
-
-#ifdef _WIN32
-		outputs.push_back({m3u8, false, true});
-#else
-		outputs.push_back({m3u8, false, false});
-#endif
 		m3u8 << "#EXTM3U" << std::endl;
 		m3u8 << "#EXT-X-TITLE: auto-play-all" << std::endl;
 		m3u8 << "#EXT-X-START" << std::endl;
+
+		outputs.push_back({m3u8, false});
 	}
 
 	// 寻找表征 第几集 的数字所在的位置，用来进行变色打印
@@ -370,15 +354,8 @@ void do_outputs(Container&& files)
 			}
 			else
 			{
-				if (out.to_utf8)
-				{
-					auto u8str = file.u8string();
-					out.outstream << std::string_view((const char*) u8str.c_str(), u8str.size()) << std::endl;
-				}
-				else
-				{
-					out.outstream << f << std::endl;
-				}
+
+				out.outstream << f << std::endl;
 			}
 		}
 	}
@@ -401,8 +378,8 @@ int main(int argc, char* argv[])
 			return 2;
 		}
 	}
-	auto mkvfiles = glob("*.mkv");
-	auto mp4files = glob("*.mp4");
+	auto mkvfiles = glob(u8"*.mkv");
+	auto mp4files = glob(u8"*.mp4");
 	auto files = merge(mkvfiles, mp4files);
 
 
@@ -413,7 +390,7 @@ int main(int argc, char* argv[])
 
 	if (files.empty())
 	{
-		std::cerr << "no videos found" << std::endl;
+		nowide::cerr << "no videos found" << std::endl;
 		return 1;
 	}
 

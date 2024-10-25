@@ -9,6 +9,10 @@ if (WIN32)
     link_libraries(win32port)
 endif()
 
+add_subdirectory(nowide_standalone_v11.3.0)
+
+link_libraries(nowide::nowide)
+
 add_executable(createplaylist main.cpp)
 
 install(TARGETS createplaylist DESTINATION bin)
