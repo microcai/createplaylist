@@ -8,6 +8,7 @@
 #include <unistd.h>
 #endif
 
+#include <type_traits>
 #include <algorithm>
 #include <cctype>
 #include <cstdlib>
@@ -29,21 +30,89 @@ concept ContainerType = requires(T a) {
 	std::end(a);
 };
 
-template<ContainerType Container>
-auto merge(Container&& list1, Container&& list2)
+template<typename T>
+concept STLContainerType = requires(T a) {
+	a.begin();
+	a.end();
+	a.size();
+	std::back_inserter(a);
+};
+
+
+template<STLContainerType Container>
+auto concat(Container&& list1, Container&& list2)
 {
 	std::decay_t<Container> ret = list1;
 	std::copy(std::begin(list2), std::end(list2), std::back_inserter(ret));
 	return ret;
 }
 
-template<ContainerType Container, typename Transformer>
+template<template<typename...> typename ResultContainer, ContainerType Container, typename Transformer>
 auto map(Container&& list1, Transformer&& transformer)
 {
-	std::decay_t<Container> ret;
-	std::transform(std::begin(list2), std::end(list2), std::back_inserter(ret), std::forward<Transformer>(transformer));
+	ResultContainer<std::invoke_result_t<Transformer, typename std::decay_t<Container>::value_type> > ret;
+	std::transform(std::begin(list1), std::end(list1), std::back_inserter(ret), std::forward<Transformer>(transformer));
 	return ret;
 }
+
+template<STLContainerType Container>
+auto as_container(Container&& c, int size)
+{
+	return std::forward<Container>(c);
+}
+
+template<typename ElementType>
+auto as_container(ElementType * c, int size)
+{
+	struct string_array_wrap
+	{
+		ElementType* _array;
+		int _size;
+		using value_type = ElementType;
+
+		struct iterator
+		{
+			string_array_wrap& parent;
+			int cur_pos;
+
+			ElementType& operator * ()
+			{
+				return parent._array[cur_pos];
+			}
+
+			bool operator == (const iterator& other)
+			{
+				return cur_pos == other.cur_pos;
+			}
+
+			iterator& operator +(int inc) {
+				cur_pos += inc;
+				return *this;
+			}
+
+			iterator& operator ++() {
+				cur_pos ++;
+				return *this;
+			}
+
+		};
+
+		iterator begin()
+		{
+			return iterator{*this, 0};
+		}
+
+		iterator end()
+		{
+			return iterator{*this, _size};
+		}
+
+		int size() const { return _size;}
+
+	};
+	return string_array_wrap{c, size};
+}
+
 
 template<typename resourcetype, typename cleanuper = decltype(&free)>
 struct raii_resource
@@ -103,19 +172,15 @@ struct raii_resource
 
 auto glob(std::string pattern)
 {
-	std::vector<std::filesystem::path> ret;
-
 	raii_resource<glob_t, decltype(&globfree)> glob_result{&globfree};
 
 	::glob(reinterpret_cast<const char*>(pattern.c_str()), GLOB_ERR | GLOB_MARK | GLOB_NOSORT | GLOB_NOESCAPE, nullptr, &glob_result);
 
-	for (auto i = 0; i < glob_result->gl_pathc; i++)
+	return map<std::vector>(as_container(glob_result->gl_pathv, glob_result->gl_pathc), [](const auto& gl_path)
 	{
-		std::string globed_file{glob_result->gl_pathv[i]};
-		ret.push_back(std::filesystem::path{std::move(globed_file)});
-	}
-
-	return ret;
+		std::string globed_file{gl_path};
+		return std::filesystem::path{std::move(globed_file)};
+	});
 }
 
 std::vector<int> find_digi_for_two_string(const std::string& a, const std::string& b)
@@ -171,7 +236,7 @@ auto find_digi_for_episode(Container&& list)
 
 				auto diff_idx = find_digi_for_two_string(file1.string(), file2.string());
 
-				diff_idx_array = merge(diff_idx_array, diff_idx);
+				diff_idx_array = concat(diff_idx_array, diff_idx);
 			}
 		}
 	}
@@ -397,7 +462,7 @@ int main(int argc, char** argv, char** env)
 
 	auto mkvfiles = glob(glob_pattern_prefix + "*.mkv");
 	auto mp4files = glob(glob_pattern_prefix + "*.mp4");
-	auto files = merge(mkvfiles, mp4files);
+	auto files = concat(mkvfiles, mp4files);
 
 
 	// 进行根据文件名里的自然阿拉伯数字进行排序
