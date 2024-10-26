@@ -28,7 +28,9 @@
 
 #include "raii_util.hpp"
 
-auto glob(std::string pattern)
+// element_type 可以是 std::string, std::filesystem::path, boost::filesystem::path
+template<typename element_type = std::filesystem::path>
+static auto glob(std::string pattern)
 {
 	raii_pod<glob_t, &globfree> glob_result;
 
@@ -36,8 +38,7 @@ auto glob(std::string pattern)
 
 	return map<std::vector>(as_container(glob_result->gl_pathv, glob_result->gl_pathc), [](const auto& gl_path)
 	{
-		std::string globed_file{gl_path};
-		return std::filesystem::path{std::move(globed_file)};
+		return element_type{std::string{gl_path}};
 	});
 }
 
