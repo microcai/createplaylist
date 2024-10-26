@@ -25,10 +25,17 @@
 #include <string>
 #include "nowide/convert.hpp"
 
+struct auto_handle
+{
+	HANDLE handle;
+	operator HANDLE () { return handle; }
+	auto_handle(HANDLE handle) : handle(handle) {}
+	~auto_handle() { FindClose(handle); }
+};
+
 int glob(const char* pattern, int flags, void* unused, glob_t* pglob)
 {
 	std::string path;
-	int err = 0;
 	size_t len;
 	WIN32_FIND_DATAW finddata = {0};
 
@@ -43,7 +50,7 @@ int glob(const char* pattern, int flags, void* unused, glob_t* pglob)
 	}
 	path.resize(len);
 
-	HANDLE hfindfile = FindFirstFileExW(nowide::widen(pattern).c_str(), FindExInfoBasic, &finddata, FindExSearchNameMatch, nullptr, 0);
+	auto_handle hfindfile = FindFirstFileExW(nowide::widen(pattern).c_str(), FindExInfoBasic, &finddata, FindExSearchNameMatch, nullptr, 0);
 
 	if (!pattern || flags != (flags & GLOB_FLAGS) || unused || !pglob)
 	{
@@ -56,27 +63,17 @@ int glob(const char* pattern, int flags, void* unused, glob_t* pglob)
 		do
 		{
 			pglob->gl_pathc ++;
-
-			std::string cFileName = nowide::narrow(finddata.cFileName);
-
-			pglob->gl_pathv.push_back( path + cFileName );
+			pglob->gl_pathv.push_back( path + nowide::narrow(finddata.cFileName) );
 		}
-		while (!err && FindNextFileW(hfindfile, &finddata));
-
-		FindClose(hfindfile);
+		while (FindNextFileW(hfindfile, &finddata));
 	}
 	else
 	{
-		err = -ENOENT;
+		return -ENOENT;
 	}
-
-	return err;
+	return 0;
 }
 
 void globfree(glob_t* pglob)
 {
-	if (pglob)
-	{
-		pglob->gl_pathv.clear();
-	}
 }
