@@ -37,6 +37,14 @@ auto merge(Container&& list1, Container&& list2)
 	return ret;
 }
 
+template<ContainerType Container, typename Transformer>
+auto map(Container&& list1, Transformer&& transformer)
+{
+	std::decay_t<Container> ret;
+	std::transform(std::begin(list2), std::end(list2), std::back_inserter(ret), std::forward<Transformer>(transformer));
+	return ret;
+}
+
 template<typename resourcetype, typename cleanuper = decltype(&free)>
 struct raii_resource
 {
