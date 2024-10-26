@@ -25,19 +25,35 @@
 #include <string>
 #include "nowide/convert.hpp"
 
-struct auto_handle
+struct DirFinder
 {
 	HANDLE handle;
-	operator HANDLE () { return handle; }
-	auto_handle(HANDLE handle) : handle(handle) {}
-	~auto_handle() { FindClose(handle); }
+	WIN32_FIND_DATAW finddata;
+
+	~DirFinder() { FindClose(handle); }
+
+	DirFinder(std::wstring pFileName)
+	{
+		handle = FindFirstFileExW(pFileName.c_str(), FindExInfoBasic, &finddata, FindExSearchNameMatch, nullptr, 0);
+	}
+
+	operator bool () const { return handle != INVALID_HANDLE_VALUE; }
+
+	bool next()
+	{
+		return FindNextFileW(handle, &finddata);
+	}
+
+	operator std::string() const
+	{
+		return nowide::narrow(finddata.cFileName);
+	}
 };
 
 int glob(const char* pattern, int flags, void* unused, glob_t* pglob)
 {
 	std::string path;
 	size_t len;
-	WIN32_FIND_DATAW finddata = {0};
 
 	pglob->gl_pathc = 0;
 
@@ -50,7 +66,6 @@ int glob(const char* pattern, int flags, void* unused, glob_t* pglob)
 	}
 	path.resize(len);
 
-	auto_handle hfindfile = FindFirstFileExW(nowide::widen(pattern).c_str(), FindExInfoBasic, &finddata, FindExSearchNameMatch, nullptr, 0);
 
 	if (!pattern || flags != (flags & GLOB_FLAGS) || unused || !pglob)
 	{
@@ -58,14 +73,16 @@ int glob(const char* pattern, int flags, void* unused, glob_t* pglob)
 		return EINVAL;
 	}
 
-	if (hfindfile != INVALID_HANDLE_VALUE)
+	DirFinder findfile(nowide::widen(pattern));
+
+	if (findfile)
 	{
 		do
 		{
 			pglob->gl_pathc ++;
-			pglob->gl_pathv.push_back( path + nowide::narrow(finddata.cFileName) );
+			pglob->gl_pathv.push_back( path + static_cast<std::string>(findfile) );
 		}
-		while (FindNextFileW(hfindfile, &finddata));
+		while (findfile.next());
 	}
 	else
 	{
