@@ -219,8 +219,6 @@ void do_outputs(Container&& files)
 		m3u8.open("000-playlist.m3u8");
 		m3u8 << "#EXTM3U" << std::endl;
 		m3u8 << "#EXT-X-TITLE: auto-play-all" << std::endl;
-		m3u8 << "#EXT-X-START" << std::endl;
-
 		outputs.push_back({m3u8, false});
 	}
 
@@ -241,30 +239,16 @@ void do_outputs(Container&& files)
 					// output color full digit
 					out.outstream << f.substr(0, digi_for_episode);
 
-					char* r = nullptr;
-					strtoll(&f[digi_for_episode], &r, 10);
-
-					if (r)
+					auto remain_pos	= digi_for_episode;
+					out.outstream << "\033[0;35m" << "\u001b[1m";
+					while( std::isdigit(f[remain_pos]))
 					{
-						auto remain_pos = r - f.c_str();
-						if (out.is_tty)
-						{
-							out.outstream << "\033[0;35m" << "\u001b[1m";
-						}
-
-						out.outstream << f.substr(digi_for_episode, remain_pos - digi_for_episode);
-
-						if (out.is_tty)
-						{
-							out.outstream << "\033[0m";
-						}
-
-						out.outstream << f.substr(remain_pos);
+						out.outstream << f[remain_pos];
+						remain_pos++;
 					}
-					else
-					{
-						out.outstream << f.substr(digi_for_episode);
-					}
+
+					out.outstream << "\033[0m";
+					out.outstream << f.substr(remain_pos);
 				}
 				else
 				{
@@ -278,12 +262,6 @@ void do_outputs(Container&& files)
 			}
 		}
 	}
-
-	if (output)
-	{
-		*output << "#EXT-X-ENDLIST" << std::endl;
-	}
-
 }
 
 #ifdef _WIN32
