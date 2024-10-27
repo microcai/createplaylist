@@ -42,9 +42,10 @@ static auto glob(std::string pattern)
 	});
 }
 
-std::vector<int> find_digi_for_two_string(const std::string& a, const std::string& b)
+template<template<typename...> typename  Container = std::vector>
+Container<int> find_digi_for_two_string(const std::string& a, const std::string& b)
 {
-	std::vector<int> ret;
+	Container<int> ret;
 	for (auto i = 0; (i < a.size()) && (i < b.size()); i++)
 	{
 		if (std::isdigit(a[i]) && std::isdigit(b[i]))
