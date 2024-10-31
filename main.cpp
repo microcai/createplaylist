@@ -32,11 +32,11 @@
 template<typename element_type = std::filesystem::path>
 static auto glob(std::string pattern)
 {
-	raii_pod<glob_t, &globfree> glob_result;
-
+	glob_t glob_result;
 	::glob(reinterpret_cast<const char*>(pattern.c_str()), GLOB_ERR | GLOB_MARK | GLOB_NOSORT | GLOB_NOESCAPE, nullptr, &glob_result);
+	fn_unique_ptr<glob_t,globfree> auto_free_glob(&glob_result);
 
-	return map<std::vector>(as_container(glob_result->gl_pathv, glob_result->gl_pathc), [](const auto& gl_path)
+	return map<std::vector>(as_container(glob_result.gl_pathv, glob_result.gl_pathc), [](const auto& gl_path)
 	{
 		return element_type{std::string{gl_path}};
 	});
