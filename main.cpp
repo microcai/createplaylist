@@ -116,7 +116,7 @@ auto find_digi_for_episode(Container&& list)
 		idx_counts.push_back(pair);
 	}
 
-	std::sort(idx_counts.begin(), idx_counts.end(), [](auto& a, auto& b) { return a.second < b.second; });
+	std::ranges::sort(idx_counts, [](auto& a, auto& b) { return a.second < b.second; });
 	// 选择 出现次数最最最多的数字
 	return idx_counts.rbegin()->first;
 }
@@ -304,7 +304,7 @@ int main(int argc, char** argv, char** env)
 
 
 	// 进行根据文件名里的自然阿拉伯数字进行排序
-	std::sort(std::begin(files), std::end(files), filename_human_compare{});
+	std::ranges::sort(files, filename_human_compare{});
 
 	// 最后输出 m3u8 格式
 
