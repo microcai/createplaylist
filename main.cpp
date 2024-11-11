@@ -310,10 +310,14 @@ int main(int argc, char** argv, char** env)
 		}
 	}
 
-	auto mkvfiles = glob<std::string>(glob_pattern_prefix + "*.mkv");
-	auto mp4files = glob<std::string>(glob_pattern_prefix + "*.mp4");
-	auto files = concat(mkvfiles, mp4files);
+	auto globing = [&]()
+	{
+		auto mkvfiles = glob<std::string>(glob_pattern_prefix + "*.mkv");
+		auto mp4files = glob<std::string>(glob_pattern_prefix + "*.mp4");
+		return concat(mkvfiles, mp4files);
+	};
 
+	auto files = globing();
 
 	// 进行根据文件名里的自然阿拉伯数字进行排序
 	std::ranges::sort(files, filename_human_compare{});
