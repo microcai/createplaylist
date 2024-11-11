@@ -24,7 +24,9 @@ concept STLContainerType = requires(T a) {
 template<STLContainerType Container>
 auto concat(Container&& list1, Container&& list2)
 {
-	std::decay_t<Container> ret = list1;
+	std::decay_t<Container> ret(list1.get_allocator());
+	ret.reserve(list1.size() + list2.size());
+	std::copy(std::begin(list1), std::end(list1), std::back_inserter(ret));
 	std::copy(std::begin(list2), std::end(list2), std::back_inserter(ret));
 	return ret;
 }

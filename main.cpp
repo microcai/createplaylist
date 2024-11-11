@@ -18,7 +18,9 @@
 #include <map>
 #include <string>
 #include <vector>
-
+#include <memory_resource>
+#include <list>
+#include <deque>
 #include <glob.h>
 
 #include "nowide/iostream.hpp"
@@ -38,14 +40,15 @@ static auto glob(std::string pattern)
 
 	return map<std::vector>(as_container(glob_result.gl_pathv, glob_result.gl_pathc), [](const auto& gl_path)
 	{
-		return element_type{std::string{gl_path}};
+		return element_type{std::string_view{gl_path}};
 	});
 }
 
-template<template<typename...> typename  Container = std::vector>
-Container<int> find_digi_for_two_string(const std::string& a, const std::string& b)
+template<template<typename...> typename  Container = std::vector, typename Allocator = std::allocator<int>>
+Container<int> find_digi_for_two_string(std::string_view a, std::string_view b, Allocator alloc)
 {
-	Container<int> ret;
+	Container<int> ret(alloc);
+
 	for (auto i = 0; (i < a.size()) && (i < b.size()); i++)
 	{
 		if (std::isdigit(a[i]) && std::isdigit(b[i]))
@@ -59,7 +62,7 @@ Container<int> find_digi_for_two_string(const std::string& a, const std::string&
 			}
 			if (remain)
 			{
-				i = remain - a.c_str() - 1;
+				i = remain - a.data() - 1;
 			}
 		}
 	}
@@ -76,7 +79,9 @@ auto find_digi_for_episode(Container&& list)
 		return 0;
 	}
 
-	std::vector<int> diff_idx_array;
+	std::pmr::monotonic_buffer_resource mbr;
+
+	std::pmr::list<int> diff_idx_array(&mbr);
 
 	// 方法就是查找文件名的差异部分的最大值
 	// 进行 两两 比对
@@ -91,17 +96,17 @@ auto find_digi_for_episode(Container&& list)
 				std::advance(list_iter_a, a);
 				std::advance(list_iter_b, b);
 
-				auto file1 = *list_iter_a;
-				auto file2 = *list_iter_b;
+				const auto& file1 = *list_iter_a;
+				const auto& file2 = *list_iter_b;
 
-				auto diff_idx = find_digi_for_two_string(file1.string(), file2.string());
+				auto diff_idx = find_digi_for_two_string<std::pmr::list>(file1, file2, &mbr);
 
-				diff_idx_array = concat(diff_idx_array, diff_idx);
+				diff_idx_array.splice(diff_idx_array.end(), std::move(diff_idx));
 			}
 		}
 	}
 
-	std::map<int, int> idx_count_map;
+	std::pmr::map<int, int> idx_count_map(&mbr);
 
 	// 统计下标和次数
 
@@ -110,7 +115,7 @@ auto find_digi_for_episode(Container&& list)
 		idx_count_map[diff_idx] += idx_count_map.count(diff_idx);
 	}
 
-	std::vector<std::pair<int, int>> idx_counts;
+	std::pmr::vector<std::pair<int, int>> idx_counts(&mbr);
 	for (auto& pair : idx_count_map)
 	{
 		idx_counts.push_back(pair);
@@ -133,7 +138,7 @@ auto find_digi_for_episode(Container&& list)
 template<bool reverse = false>
 struct filename_human_compare
 {
-	bool operator()(const std::string& a, const std::string& b)
+	bool operator()(std::string_view a, std::string_view b)
 	{
 		int idx = 0;
 		do
@@ -171,20 +176,26 @@ struct filename_human_compare
 			return a.length() < b.length();
 	}
 
+	bool operator()(const std::string& a, const std::string& b)
+	{
+		return (*this)(std::string_view{a}, std::string_view{b});
+	}
+
 	bool operator()(const std::filesystem::path& a, const std::filesystem::path& b)
 	{
-		return(*this)(a.string(), b.string());
+		return (*this)(std::string_view{a.string()}, std::string_view{b.string()});
 	}
 
 };
 
-template<ContainerType Container> auto get_base_names(Container&& files)
+template<ContainerType Container, typename Allocator>
+auto get_base_names(Container&& files, Allocator alloc)
 {
-	std::decay_t<Container> ret;
+	std::pmr::vector<std::pmr::string> ret(alloc);
 
 	for (auto f : files)
 	{
-		ret.push_back(std::filesystem::path(f).stem().string());
+		ret.emplace_back(std::filesystem::path(f).stem().string());
 	}
 
 	return ret;
@@ -223,13 +234,16 @@ void do_outputs(Container&& files)
 		outputs.push_back({m3u8, false});
 	}
 
+	std::pmr::monotonic_buffer_resource mbr;
+
 	// 寻找表征 第几集 的数字所在的位置，用来进行变色打印
-	auto file_names = get_base_names(files);
+	auto file_names = get_base_names(files, &mbr);
 	auto digi_for_episode = find_digi_for_episode(file_names);
 
 	for (const auto& file : files)
 	{
-		std::string f = file.string();
+		// std::string ff = file.string();
+		std::string_view f = file;
 
 		for (auto out : outputs)
 		{
@@ -298,8 +312,8 @@ int main(int argc, char** argv, char** env)
 		glob_pattern_prefix += std::filesystem::path::preferred_separator;
 	}
 
-	auto mkvfiles = glob(glob_pattern_prefix + "*.mkv");
-	auto mp4files = glob(glob_pattern_prefix + "*.mp4");
+	auto mkvfiles = glob<std::string>(glob_pattern_prefix + "*.mkv");
+	auto mp4files = glob<std::string>(glob_pattern_prefix + "*.mp4");
 	auto files = concat(mkvfiles, mp4files);
 
 
