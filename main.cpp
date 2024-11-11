@@ -289,6 +289,7 @@ int chdir(const char* newdir)
 int main(int argc, char** argv, char** env)
 {
 	bool is_tty = isatty(1);
+	std::string glob_pattern_prefix;
 
 	nowide::args _args{argc, argv, env};
 	// 首先进入到目标目录. 然后列举出所有的视频文件
@@ -302,14 +303,11 @@ int main(int argc, char** argv, char** env)
 				return 2;
 			}
 		}
-	}
-
-	std::string glob_pattern_prefix;
-
-	if (!is_tty)
-	{
-		glob_pattern_prefix = argv[1];
-		glob_pattern_prefix += std::filesystem::path::preferred_separator;
+		else
+		{
+			glob_pattern_prefix = argv[1];
+			glob_pattern_prefix += std::filesystem::path::preferred_separator;
+		}
 	}
 
 	auto mkvfiles = glob<std::string>(glob_pattern_prefix + "*.mkv");
