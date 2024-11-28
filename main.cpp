@@ -192,10 +192,15 @@ template<ContainerType Container, typename Allocator>
 auto get_base_names(Container&& files, Allocator alloc)
 {
 	std::pmr::vector<std::pmr::string> ret(alloc);
+	ret.reserve(files.size());
 
 	for (auto f : files)
 	{
+		#ifdef _WIN32
+		ret.emplace_back(std::filesystem::path(nowide::widen(f)).stem().string());
+		#else
 		ret.emplace_back(std::filesystem::path(f).stem().string());
+		#endif
 	}
 
 	return ret;
