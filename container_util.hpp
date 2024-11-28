@@ -48,7 +48,7 @@ auto as_container(Container&& c, int size)
 template<typename ElementType>
 auto as_container(ElementType * c, int size)
 {
-	struct string_array_wrap
+	struct array_wrap
 	{
 		ElementType* _array;
 		int _size;
@@ -56,7 +56,7 @@ auto as_container(ElementType * c, int size)
 
 		struct iterator
 		{
-			string_array_wrap& parent;
+			array_wrap& parent;
 			int cur_pos;
 
 			ElementType& operator * ()
@@ -94,5 +94,5 @@ auto as_container(ElementType * c, int size)
 		int size() const { return _size;}
 
 	};
-	return string_array_wrap{c, size};
+	return array_wrap{c, size};
 }
