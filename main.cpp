@@ -197,7 +197,7 @@ auto get_base_names(Container&& files, Allocator alloc)
 	for (auto f : files)
 	{
 		#ifdef _WIN32
-		ret.emplace_back(std::filesystem::path(nowide::widen(f)).stem().string());
+		ret.emplace_back(nowide::narrow(std::filesystem::path(nowide::widen(f)).stem().wstring()));
 		#else
 		ret.emplace_back(std::filesystem::path(f).stem().string());
 		#endif
