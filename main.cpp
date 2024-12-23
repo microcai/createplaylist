@@ -27,12 +27,26 @@
 #include "nowide/args.hpp"
 
 #include "container_util.hpp"
+#include "generic_string.hpp"
 
 #include "raii_util.hpp"
 
+
+struct GC : public std::pmr::memory_resource
+{
+    virtual void* do_allocate(size_t __bytes, size_t __alignment) override
+	{
+		return std::malloc(__bytes);
+	}
+
+    virtual void  do_deallocate(void* __p, size_t __bytes, size_t __alignment) override {}
+
+    virtual bool do_is_equal(const memory_resource& __other) const noexcept override  { return true ;}
+};
+
 // element_type 可以是 std::string, std::filesystem::path, boost::filesystem::path
 template<typename element_type = std::filesystem::path>
-static auto glob(std::string pattern)
+static auto glob(auto pattern)
 {
 	glob_t glob_result;
 	::glob(reinterpret_cast<const char*>(pattern.c_str()), GLOB_ERR | GLOB_MARK | GLOB_NOSORT | GLOB_NOESCAPE, nullptr, &glob_result);
@@ -212,18 +226,14 @@ struct output
 	bool is_tty;
 };
 
-template<ContainerType Container>
-void do_outputs(Container&& files)
+std::vector<output> get_outputs()
 {
-
 	std::vector<output> outputs;
-
 	std::ostream* output = nullptr;
 
 	std::ofstream m3u8;
 
 	bool is_tty = isatty(1);
-
 
 	if (!is_tty)
 	{
@@ -238,7 +248,12 @@ void do_outputs(Container&& files)
 		m3u8 << "#EXT-X-TITLE: auto-play-all" << std::endl;
 		outputs.push_back({m3u8, false});
 	}
+	return outputs;
+}
 
+template<ContainerType Container>
+void do_outputs(Container&& files, std::vector<output> outputs)
+{
 	std::pmr::monotonic_buffer_resource mbr;
 
 	// 寻找表征 第几集 的数字所在的位置，用来进行变色打印
@@ -335,7 +350,7 @@ int main(int argc, char** argv, char** env)
 		return 1;
 	}
 
-	do_outputs(files);
+	do_outputs(files, get_outputs());
 
 	return 0;
 }
