@@ -31,6 +31,9 @@
 
 #include "raii_util.hpp"
 
+#ifdef _WIN32
+#define isatty _isatty
+#endif
 
 struct GC : public std::pmr::memory_resource
 {
